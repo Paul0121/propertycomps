@@ -1,0 +1,42 @@
+import requests
+from bs4 import BeautifulSoup
+
+def get_redfin_comps(address):
+    """Scrapes Redfin for property comps."""
+    search_url = f"https://www.redfin.com/stingray/api/gis?al=1&market=dc&num_homes=5&ord=distance_asc&page_number=1&query={address}"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    
+    response = requests.get(search_url, headers=headers)
+    
+    if response.status_code == 200:
+        data = response.json()
+        if "homes" in data:
+            return data["homes"]
+    return None
+
+def calculate_arv(comps):
+    """Estimate ARV based on comp prices."""
+    prices = [comp["price"] for comp in comps if "price" in comp]
+    return sum(prices) / len(prices) if prices else 0
+
+def calculate_mao(arv, discount=0.6):
+    """Calculate MAO (Max Allowable Offer)."""
+    return arv * discount
+
+def main():
+    address = input("Enter property address: ")
+    comps = get_redfin_comps(address)
+    
+    if comps:
+        arv = calculate_arv(comps)
+        mao = calculate_mao(arv)
+        print(f"\nEstimated ARV: ${arv:,.2f}")
+        print(f"Maximum Allowable Offer (MAO): ${mao:,.2f}")
+    else:
+        print("No comps found. Try a different address.")
+
+if __name__ == "__main__":
+    main()
