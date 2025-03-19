@@ -1,39 +1,73 @@
 import streamlit as st
 import requests
-import json
+import pandas as pd
 
 def fetch_property_data(address, api_key):
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
+    headers = {"apikey": api_key}
     params = {"address": address}
-    headers = {
-        "accept": "application/json",
-        "apikey": api_key
+    
+    response = requests.get(base_url, headers=headers, params=params)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error(f"Error fetching property data: {response.status_code} {response.reason}")
+        return None
+
+def fetch_comps(lat, lon, api_key):
+    base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/sales/comp"
+    headers = {"apikey": api_key}
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "radius": "1",
+        "minSalesPrice": "50000",
+        "maxSalesPrice": "1000000",
+        "propertytype": "SFR"
     }
     
-    try:
-        response = requests.get(base_url, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.HTTPError as http_err:
-        st.error(f"HTTP error occurred: {http_err}")
-    except requests.exceptions.RequestException as req_err:
-        st.error(f"Request error occurred: {req_err}")
-    return None
-
-def main():
-    st.title("Real Estate Property Data Fetcher")
-    api_key = st.text_input("Enter your Attom API Key", type="password")
-    address = st.text_input("Enter property address")
+    response = requests.get(base_url, headers=headers, params=params)
     
-    if st.button("Fetch Data"):
-        if not api_key:
-            st.error("API key is required!")
-        elif not address:
-            st.error("Property address is required!")
-        else:
-            data = fetch_property_data(address, api_key)
-            if data:
-                st.json(data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error(f"Error fetching comps: {response.status_code} {response.reason}")
+        return None
 
-if __name__ == "__main__":
-    main()
+def calculate_arv(comps):
+    if not comps or "property" not in comps:
+        return 0
+    prices = [comp["saleAmount"] for comp in comps["property"] if "saleAmount" in comp]
+    return sum(prices) / len(prices) if prices else 0
+
+def calculate_mao(arv, repair_costs, percentage=0.6):
+    return (arv * percentage) - repair_costs
+
+st.title("Real Estate Valuation Tool")
+
+api_key = st.text_input("Enter Attom Data API Key", type="password")
+address = st.text_input("Enter Property Address")
+repair_costs = st.number_input("Estimated Repair Costs", min_value=0, step=1000)
+
+if st.button("Analyze Property"):
+    if api_key and address:
+        property_data = fetch_property_data(address, api_key)
+        if property_data:
+            lat = property_data["property"][0]["location"]["latitude"]
+            lon = property_data["property"][0]["location"]["longitude"]
+            comps = fetch_comps(lat, lon, api_key)
+            
+            arv = calculate_arv(comps)
+            mao = calculate_mao(arv, repair_costs)
+            
+            st.subheader("Property Valuation")
+            st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
+            st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
+            
+            if comps:
+                st.subheader("Comparable Properties")
+                comp_df = pd.DataFrame([{ "Address": comp["address"]["oneLine"], "Sale Price": comp["saleAmount"] } for comp in comps["property"] if "saleAmount" in comp])
+                st.dataframe(comp_df)
+    else:
+        st.error("Please enter both API key and property address.")
