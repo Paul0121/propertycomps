@@ -1,42 +1,48 @@
+import streamlit as st
+import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
-def get_redfin_comps(address):
-    """Scrapes Redfin for property comps."""
-    search_url = f"https://www.redfin.com/stingray/api/gis?al=1&market=dc&num_homes=5&ord=distance_asc&page_number=1&query={address}"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-    
-    response = requests.get(search_url, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        if "homes" in data:
-            return data["homes"]
-    return None
+# Function to fetch live real estate data (alternative to Zillow API)
+def get_comps(address):
+    # Placeholder: Replace with actual data source (e.g., Redfin, Realtor.com, or a real estate API)
+    return [
+        {"Address": "123 Main St", "Price": 250000, "SqFt": 1500, "Beds": 3, "Baths": 2},
+        {"Address": "456 Oak Ave", "Price": 275000, "SqFt": 1600, "Beds": 3, "Baths": 2},
+        {"Address": "789 Pine Rd", "Price": 265000, "SqFt": 1550, "Beds": 3, "Baths": 2}
+    ]
 
+# Function to calculate ARV
 def calculate_arv(comps):
-    """Estimate ARV based on comp prices."""
-    prices = [comp["price"] for comp in comps if "price" in comp]
+    prices = [comp["Price"] for comp in comps]
     return sum(prices) / len(prices) if prices else 0
 
-def calculate_mao(arv, discount=0.6):
-    """Calculate MAO (Max Allowable Offer)."""
-    return arv * discount
+# Function to estimate repair costs
+def estimate_repairs(sqft):
+    return sqft * 30  # Assume $30 per sqft repair cost
 
-def main():
-    address = input("Enter property address: ")
-    comps = get_redfin_comps(address)
+# Function to calculate MAO
+def calculate_mao(arv, repair_costs):
+    return 0.6 * arv - repair_costs
+
+# Streamlit UI
+st.title("AI Real Estate Comps & Valuation")
+address = st.text_input("Enter Property Address:")
+
+if st.button("Run Comps"):
+    comps = get_comps(address)
+    arv = calculate_arv(comps)
+    repair_costs = estimate_repairs(1500)  # Placeholder value
+    mao = calculate_mao(arv, repair_costs)
     
-    if comps:
-        arv = calculate_arv(comps)
-        mao = calculate_mao(arv)
-        print(f"\nEstimated ARV: ${arv:,.2f}")
-        print(f"Maximum Allowable Offer (MAO): ${mao:,.2f}")
-    else:
-        print("No comps found. Try a different address.")
-
-if __name__ == "__main__":
-    main()
+    st.subheader("Comparable Properties")
+    st.write(pd.DataFrame(comps))
+    
+    st.subheader("Valuation Summary")
+    st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
+    st.write(f"**Estimated Repair Costs:** ${repair_costs:,.2f}")
+    st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
+    
+    st.subheader("How We Calculated This:")
+    st.write("ARV is determined by averaging the sale prices of comparable properties.")
+    st.write("Repair costs are estimated based on an average cost per square foot.")
+    st.write("MAO is calculated using 60% of ARV minus estimated repair costs.")
