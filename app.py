@@ -13,6 +13,7 @@ def fetch_property_data(address, api_key):
         return response.json()
     else:
         st.error(f"Error fetching property data: {response.status_code} {response.reason}")
+        st.write(response.text)  # Debugging output
         return None
 
 def fetch_comps(lat, lon, api_key):
@@ -30,9 +31,15 @@ def fetch_comps(lat, lon, api_key):
     response = requests.get(base_url, headers=headers, params=params)
     
     if response.status_code == 200:
-        return response.json()
+        data = response.json()
+        if "property" in data:
+            return data
+        else:
+            st.warning("No comparable properties found in the area.")
+            return None
     else:
         st.error(f"Error fetching comps: {response.status_code} {response.reason}")
+        st.write(response.text)  # Debugging output
         return None
 
 def calculate_arv(comps):
@@ -53,7 +60,7 @@ repair_costs = st.number_input("Estimated Repair Costs", min_value=0, step=1000)
 if st.button("Analyze Property"):
     if api_key and address:
         property_data = fetch_property_data(address, api_key)
-        if property_data:
+        if property_data and "property" in property_data:
             lat = property_data["property"][0]["location"]["latitude"]
             lon = property_data["property"][0]["location"]["longitude"]
             comps = fetch_comps(lat, lon, api_key)
@@ -65,7 +72,7 @@ if st.button("Analyze Property"):
             st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
             st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
             
-            if comps:
+            if comps and "property" in comps:
                 st.subheader("Comparable Properties")
                 comp_df = pd.DataFrame([{ "Address": comp["address"]["oneLine"], "Sale Price": comp["saleAmount"] } for comp in comps["property"] if "saleAmount" in comp])
                 st.dataframe(comp_df)
