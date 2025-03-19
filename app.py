@@ -4,15 +4,20 @@ import requests
 
 # Function to fetch live real estate data based on the input address
 def get_comps(address):
-    # Replace with an actual API call to fetch comps within 0.5 to 1 mile
-    # Example: Using an external real estate API
+    # Replace with an actual working API call to fetch comps within 0.5 to 1 mile
+    api_url = "https://api.example.com/get_comps"  # Placeholder, replace with a real API
+    params = {"address": address, "radius": 1}
+    
     try:
-        response = requests.get(f"https://realestateapi.com/comps?address={address}&radius=1")
+        response = requests.get(api_url, params=params, timeout=10)
         response.raise_for_status()
-        return response.json()
+        return response.json().get("comps", [])
+    except requests.exceptions.SSLError:
+        st.error("SSL Error: Unable to verify the certificate. Check the API URL.")
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching property data: {e}")
-        return []
+    
+    return []
 
 # Function to calculate ARV
 def calculate_arv(comps):
