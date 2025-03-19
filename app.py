@@ -2,18 +2,21 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# Function to fetch live real estate data (alternative to Zillow API)
+# Function to fetch live real estate data based on the input address
 def get_comps(address):
-    # Placeholder: Replace with actual data source (e.g., Redfin, Realtor.com, or a real estate API)
-    return [
-        {"Address": "123 Main St", "Price": 250000, "SqFt": 1500, "Beds": 3, "Baths": 2},
-        {"Address": "456 Oak Ave", "Price": 275000, "SqFt": 1600, "Beds": 3, "Baths": 2},
-        {"Address": "789 Pine Rd", "Price": 265000, "SqFt": 1550, "Beds": 3, "Baths": 2}
-    ]
+    # Replace with an actual API call to fetch comps within 0.5 to 1 mile
+    # Example: Using an external real estate API
+    try:
+        response = requests.get(f"https://realestateapi.com/comps?address={address}&radius=1")
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching property data: {e}")
+        return []
 
 # Function to calculate ARV
 def calculate_arv(comps):
-    prices = [comp["Price"] for comp in comps]
+    prices = [comp.get("Price", 0) for comp in comps if "Price" in comp]
     return sum(prices) / len(prices) if prices else 0
 
 # Function to estimate repair costs
@@ -30,19 +33,22 @@ address = st.text_input("Enter Property Address:")
 
 if st.button("Run Comps"):
     comps = get_comps(address)
-    arv = calculate_arv(comps)
-    repair_costs = estimate_repairs(1500)  # Placeholder value
-    mao = calculate_mao(arv, repair_costs)
-    
-    st.subheader("Comparable Properties")
-    st.write(pd.DataFrame(comps))
-    
-    st.subheader("Valuation Summary")
-    st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
-    st.write(f"**Estimated Repair Costs:** ${repair_costs:,.2f}")
-    st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
-    
-    st.subheader("How We Calculated This:")
-    st.write("ARV is determined by averaging the sale prices of comparable properties.")
-    st.write("Repair costs are estimated based on an average cost per square foot.")
-    st.write("MAO is calculated using 60% of ARV minus estimated repair costs.")
+    if comps:
+        arv = calculate_arv(comps)
+        repair_costs = estimate_repairs(1500)  # Placeholder value
+        mao = calculate_mao(arv, repair_costs)
+        
+        st.subheader("Comparable Properties")
+        st.write(pd.DataFrame(comps))
+        
+        st.subheader("Valuation Summary")
+        st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
+        st.write(f"**Estimated Repair Costs:** ${repair_costs:,.2f}")
+        st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
+        
+        st.subheader("How We Calculated This:")
+        st.write("ARV is determined by averaging the sale prices of comparable properties within a 0.5 to 1-mile radius.")
+        st.write("Repair costs are estimated based on an average cost per square foot.")
+        st.write("MAO is calculated using 60% of ARV minus estimated repair costs.")
+    else:
+        st.error("No comparable properties found. Please try another address.")
