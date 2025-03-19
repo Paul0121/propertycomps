@@ -55,18 +55,18 @@ def calculate_mao(arv, repair_costs, percentage=0.6):
 st.title("Real Estate Valuation Tool")
 
 api_key = st.text_input("Enter Attom Data API Key", type="password")
-full_address = st.text_input("Enter Property Address (Street, City, State, ZIP)")
+full_address = st.text_input("Enter Property Address")
 repair_costs = st.number_input("Estimated Repair Costs", min_value=0, step=1000)
 
 if st.button("Analyze Property"):
     if api_key and full_address:
         try:
-            parts = full_address.split(",")
-            if len(parts) < 2:
-                st.error("Please enter the full address in the format: Street, City, State ZIP")
+            address_parts = full_address.split(",")
+            if len(address_parts) < 3:
+                st.error("Please enter a full address in the format: Street, City, State ZIP")
             else:
-                address1 = parts[0].strip()
-                address2 = ",".join(parts[1:]).strip()
+                address1 = address_parts[0].strip()
+                address2 = ",".join(address_parts[1:]).strip()
                 
                 property_data = fetch_property_data(address1, address2, api_key)
                 if property_data and "property" in property_data:
