@@ -1,60 +1,39 @@
 import streamlit as st
 import requests
-import pandas as pd
+import json
 
-def fetch_state_data():
-    """Fetches state data from the given JSON response."""
-    url = "https://api.yourrealestate.com/state_lookup"
-    response = requests.get(url)
-    if response.status_code == 200:
+def fetch_property_data(address, api_key):
+    base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
+    params = {"address": address}
+    headers = {
+        "accept": "application/json",
+        "apikey": api_key
+    }
+    
+    try:
+        response = requests.get(base_url, headers=headers, params=params)
+        response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        st.error(f"HTTP error occurred: {http_err}")
+    except requests.exceptions.RequestException as req_err:
+        st.error(f"Request error occurred: {req_err}")
     return None
 
-def extract_state_info(state_data):
-    """Extracts relevant state details from the API response."""
-    states = state_data.get("response", {}).get("data", {}).get("rows", [])
-    state_dict = {state["geo_key"]: state for state in states}
-    return state_dict
-
-def calculate_arv(comps):
-    """Calculates After Repair Value (ARV) based on comparable properties."""
-    arv = sum(comp['price'] for comp in comps) / len(comps) if comps else 0
-    return arv
-
-def calculate_mao(arv, repair_costs):
-    """Calculates Maximum Allowable Offer (MAO)."""
-    mao = arv * 0.6 - repair_costs
-    return mao
-
-def fetch_comps(property_address):
-    """Fetches comparable properties from an external API."""
-    url = f"https://api.yourrealestate.com/comps?address={property_address}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json().get("comps", [])
-    return []
-
 def main():
-    st.title("Real Estate ARV & MAO Calculator")
-    property_address = st.text_input("Enter Property Address:")
-    repair_costs = st.number_input("Estimated Repair Costs ($):", min_value=0, step=500)
+    st.title("Real Estate Property Data Fetcher")
+    api_key = st.text_input("Enter your Attom API Key", type="password")
+    address = st.text_input("Enter property address")
     
-    if st.button("Calculate ARV & MAO"):
-        state_data = fetch_state_data()
-        if state_data:
-            states = extract_state_info(state_data)
-            comps = fetch_comps(property_address)
-            if comps:
-                arv = calculate_arv(comps)
-                mao = calculate_mao(arv, repair_costs)
-                st.write(f"**After Repair Value (ARV):** ${arv:,.2f}")
-                st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
-                st.write("### Comparable Properties:")
-                st.dataframe(pd.DataFrame(comps))
-            else:
-                st.error("No comparable properties found.")
+    if st.button("Fetch Data"):
+        if not api_key:
+            st.error("API key is required!")
+        elif not address:
+            st.error("Property address is required!")
         else:
-            st.error("Failed to fetch state data.")
+            data = fetch_property_data(address, api_key)
+            if data:
+                st.json(data)
 
 if __name__ == "__main__":
     main()
