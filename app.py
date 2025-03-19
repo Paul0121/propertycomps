@@ -5,7 +5,7 @@ import pandas as pd
 def fetch_property_data(address, api_key):
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
     headers = {"apikey": api_key}
-    params = {"address": address}
+    params = {"address1": address}  # Ensure correct parameter name
     
     response = requests.get(base_url, headers=headers, params=params)
     
@@ -25,7 +25,8 @@ def fetch_comps(lat, lon, api_key):
         "radius": "1",
         "minSalesPrice": "50000",
         "maxSalesPrice": "1000000",
-        "propertytype": "SFR"
+        "propertytype": "SFR",
+        "pagesize": "10"  # Ensure enough comps are retrieved
     }
     
     response = requests.get(base_url, headers=headers, params=params)
@@ -45,7 +46,7 @@ def fetch_comps(lat, lon, api_key):
 def calculate_arv(comps):
     if not comps or "property" not in comps:
         return 0
-    prices = [comp["saleAmount"] for comp in comps["property"] if "saleAmount" in comp]
+    prices = [comp["sale.amount"] for comp in comps["property"] if "sale.amount" in comp]
     return sum(prices) / len(prices) if prices else 0
 
 def calculate_mao(arv, repair_costs, percentage=0.6):
@@ -61,20 +62,24 @@ if st.button("Analyze Property"):
     if api_key and address:
         property_data = fetch_property_data(address, api_key)
         if property_data and "property" in property_data:
-            lat = property_data["property"][0]["location"]["latitude"]
-            lon = property_data["property"][0]["location"]["longitude"]
-            comps = fetch_comps(lat, lon, api_key)
-            
-            arv = calculate_arv(comps)
-            mao = calculate_mao(arv, repair_costs)
-            
-            st.subheader("Property Valuation")
-            st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
-            st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
-            
-            if comps and "property" in comps:
-                st.subheader("Comparable Properties")
-                comp_df = pd.DataFrame([{ "Address": comp["address"]["oneLine"], "Sale Price": comp["saleAmount"] } for comp in comps["property"] if "saleAmount" in comp])
-                st.dataframe(comp_df)
+            try:
+                lat = property_data["property"][0]["location"]["latitude"]
+                lon = property_data["property"][0]["location"]["longitude"]
+                comps = fetch_comps(lat, lon, api_key)
+                
+                arv = calculate_arv(comps)
+                mao = calculate_mao(arv, repair_costs)
+                
+                st.subheader("Property Valuation")
+                st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
+                st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
+                
+                if comps and "property" in comps:
+                    st.subheader("Comparable Properties")
+                    comp_df = pd.DataFrame([{ "Address": comp["address"]["oneLine"], "Sale Price": comp["sale.amount"] } for comp in comps["property"] if "sale.amount" in comp])
+                    st.dataframe(comp_df)
+            except KeyError as e:
+                st.error(f"Error processing property data: {e}")
+                st.write(property_data)  # Debugging output
     else:
         st.error("Please enter both API key and property address.")
