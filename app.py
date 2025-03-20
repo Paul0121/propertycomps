@@ -2,9 +2,11 @@ import streamlit as st
 import requests
 import pandas as pd
 
-def fetch_property_data(address1, address2, api_key):
+API_KEY = "4549d8c4838eded0760fafee492935d9"
+
+def fetch_property_data(address1, address2):
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
-    headers = {"apikey": api_key}
+    headers = {"apikey": API_KEY}
     params = {"address1": address1, "address2": address2}
     
     response = requests.get(base_url, headers=headers, params=params)
@@ -20,9 +22,9 @@ def fetch_property_data(address1, address2, api_key):
         st.write(response.text)  # Debugging output
     return None
 
-def fetch_comps(lat, lon, api_key):
+def fetch_comps(lat, lon):
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/sales/comp"
-    headers = {"apikey": api_key}
+    headers = {"apikey": API_KEY}
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -55,12 +57,11 @@ def calculate_mao(arv, repair_costs, percentage=0.6):
 
 st.title("Real Estate Valuation Tool")
 
-api_key = st.text_input("Enter Attom Data API Key", type="password")
 full_address = st.text_input("Enter Property Address (Street, City, State ZIP)")
 repair_costs = st.number_input("Estimated Repair Costs", min_value=0, step=1000)
 
 if st.button("Analyze Property"):
-    if api_key and full_address:
+    if full_address:
         address_parts = full_address.split(",")
         if len(address_parts) < 3:
             st.error("Please enter a full address in the format: Street, City, State ZIP")
@@ -68,12 +69,12 @@ if st.button("Analyze Property"):
             address1 = address_parts[0].strip()
             address2 = ",".join(address_parts[1:]).strip()
             
-            property_data = fetch_property_data(address1, address2, api_key)
+            property_data = fetch_property_data(address1, address2)
             if property_data:
                 lat = property_data.get("location", {}).get("latitude")
                 lon = property_data.get("location", {}).get("longitude")
                 if lat and lon:
-                    comps = fetch_comps(lat, lon, api_key)
+                    comps = fetch_comps(lat, lon)
                     
                     arv = calculate_arv(comps)
                     mao = calculate_mao(arv, repair_costs)
@@ -92,4 +93,4 @@ if st.button("Analyze Property"):
                 else:
                     st.error("Could not retrieve latitude and longitude for the property.")
     else:
-        st.error("Please enter both API key and property address.")
+        st.error("Please enter the property address.")
