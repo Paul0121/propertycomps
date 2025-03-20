@@ -1,19 +1,25 @@
 import streamlit as st
 import requests
 import json
+import re
 
 # Oxylabs API Credentials
 USERNAME = "dylan_aa8eN"
 PASSWORD = "DylanPogi1o+"
+
+# Function to validate Zillow URL
+def is_valid_zillow_url(url):
+    pattern = r"^https://www\.zillow\.com/homedetails/.*"
+    return re.match(pattern, url)
 
 # Function to fetch property data using Oxylabs
 def fetch_property_data(target_url):
     url = "https://realtime.oxylabs.io/v1/queries"
     headers = {"Content-Type": "application/json"}
     data = {
-        "source": "zillow",  # Using Zillow as the data source
+        "source": "zillow",
         "url": target_url,
-        "parse": True  # Enable parsing for structured output
+        "parse": True
     }
     
     response = requests.post(url, auth=(USERNAME, PASSWORD), headers=headers, json=data)
@@ -28,11 +34,11 @@ def fetch_property_data(target_url):
 # Streamlit UI
 st.title("Real Estate Valuation Tool")
 
-full_address = st.text_input("Enter Zillow Property URL (e.g., https://www.zillow.com/...)")
+full_address = st.text_input("Enter Zillow Property URL (e.g., https://www.zillow.com/homedetails/...)")
 repair_costs = st.number_input("Estimated Repair Costs", min_value=0, step=1000)
 
 if st.button("Analyze Property"):
-    if full_address.startswith("https://www.zillow.com/"):  # Validate URL
+    if is_valid_zillow_url(full_address):  # Validate Zillow URL format
         property_data = fetch_property_data(full_address)
         if property_data:
             st.subheader("Scraped Property Data")
@@ -40,4 +46,4 @@ if st.button("Analyze Property"):
         else:
             st.error("Failed to retrieve property data.")
     else:
-        st.error("Please enter a valid Zillow property URL.")
+        st.error("Please enter a valid Zillow property URL (e.g., https://www.zillow.com/homedetails/...)")
