@@ -9,7 +9,7 @@ PASSWORD = "DylanPogi1o+"
 
 # Function to fetch property data using Oxylabs
 def fetch_property_data(target_url):
-    url = "https://realtime.oxylabs.io/v1/queries"
+    url = "https://www.zillow.com/homedetails/2322-E-111th-Ave-Tampa-FL-33612/45074221_zpid/"
     headers = {"Content-Type": "application/json"}
     data = {
         "source": "zillow",  # Try specifying Zillow as the source
