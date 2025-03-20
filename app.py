@@ -4,12 +4,13 @@ import pandas as pd
 
 API_KEY = "4549d8c4838eded0760fafee492935d9"
 
-def fetch_property_data(address1, address2):
+def fetch_property_data(address, postal_code):
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
     headers = {"apikey": API_KEY}
-    params = {"address1": address1, "address2": address2}
+    params = {"address": address, "postalcode": postal_code}
     
     response = requests.get(base_url, headers=headers, params=params)
+    st.write(f"Fetching property data: {response.url}")  # Debugging output
     
     if response.status_code == 200:
         data = response.json()
@@ -29,13 +30,14 @@ def fetch_comps(lat, lon):
         "latitude": lat,
         "longitude": lon,
         "radius": "1",
-        "minSalesPrice": "50000",
-        "maxSalesPrice": "1000000",
+        "minSaleAmt": "50000",
+        "maxSaleAmt": "1000000",
         "propertytype": "SFR",
         "pagesize": "10"
     }
     
     response = requests.get(base_url, headers=headers, params=params)
+    st.write(f"Fetching comps data: {response.url}")  # Debugging output
     
     if response.status_code == 200:
         data = response.json()
@@ -66,10 +68,10 @@ if st.button("Analyze Property"):
         if len(address_parts) < 3:
             st.error("Please enter a full address in the format: Street, City, State ZIP")
         else:
-            address1 = address_parts[0].strip()
-            address2 = ",".join(address_parts[1:]).strip()
+            address = address_parts[0].strip()
+            postal_code = address_parts[-1].strip()
             
-            property_data = fetch_property_data(address1, address2)
+            property_data = fetch_property_data(address, postal_code)
             if property_data:
                 lat = property_data.get("location", {}).get("latitude")
                 lon = property_data.get("location", {}).get("longitude")
