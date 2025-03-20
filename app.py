@@ -18,7 +18,7 @@ def fetch_property_data(target_url):
     url = "https://realtime.oxylabs.io/v1/queries"
     headers = {"Content-Type": "application/json"}
     data = {
-        "source": "universal",
+        "source": "zillow",  # Use Zillow-specific scraper
         "url": target_url
     }
     
@@ -34,17 +34,16 @@ def fetch_property_data(target_url):
 # Function to fetch comparable sales data
 def fetch_comps(property_data):
     try:
-        lat = property_data["location"]["latitude"]
-        lon = property_data["location"]["longitude"]
+        zpid = property_data["zpid"]  # Extract Zillow Property ID
     except KeyError:
-        st.error("Failed to extract latitude and longitude from property data.")
+        st.error("Failed to extract property ID from Zillow data.")
         return None
     
     url = "https://realtime.oxylabs.io/v1/queries"
     headers = {"Content-Type": "application/json"}
     data = {
-        "source": "universal",
-        "url": f"https://www.zillow.com/homes/comps/{lat},{lon}/"
+        "source": "zillow",  # Use Zillow-specific scraper
+        "url": f"https://www.zillow.com/homes/comps/{zpid}_zpid/"
     }
     
     response = requests.post(url, auth=(USERNAME, PASSWORD), headers=headers, json=data)
