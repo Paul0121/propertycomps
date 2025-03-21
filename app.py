@@ -1,98 +1,62 @@
-import streamlit as st
-import requests
-import json
-import re
+from homeharvest import scrape_property
+from geopy.geocoders import Nominatim
+from geopy.distance import geodesic
 import pandas as pd
+from datetime import datetime
 
-# Oxylabs API Credentials
-USERNAME = "dylan_aa8eN"
-PASSWORD = "DylanPogi1o+"
+def get_coordinates(address):
+    geolocator = Nominatim(user_agent="ai_comps_system")
+    location = geolocator.geocode(address)
+    if location:
+        return (location.latitude, location.longitude)
+    return None
 
-# Function to validate Zillow URL
-def is_valid_zillow_url(url):
-    pattern = r"^https://www\.zillow\.com/homedetails/.*"
-    return re.match(pattern, url)
+def filter_comps(properties, target_coords, max_distance=1.0):
+    filtered = []
+    for _, row in properties.iterrows():
+        prop_coords = (row['latitude'], row['longitude'])
+        distance = geodesic(target_coords, prop_coords).miles
+        if 0.5 <= distance <= max_distance:
+            filtered.append(row)
+    return pd.DataFrame(filtered)
 
-# Function to fetch property data using Oxylabs
-def fetch_property_data(target_url):
-    url = "https://realtime.oxylabs.io/v1/queries"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "source": "universal",
-        "url": target_url
-    }
-    
-    response = requests.post(url, auth=(USERNAME, PASSWORD), headers=headers, json=data)
-    
-    st.write("Debug - Raw Property Data Response:", response.text)  # Print full response for debugging
-    
-    if response.status_code == 200:
-        return response.json()
-    else:
-        st.error(f"Error fetching property data: {response.status_code} {response.reason}")
-        return None
-
-# Function to fetch comparable sales data
-def fetch_comps(property_data):
-    try:
-        lat = property_data["location"]["latitude"]
-        lon = property_data["location"]["longitude"]
-    except KeyError:
-        st.error("Failed to extract latitude and longitude from property data.")
-        return None
-    
-    url = "https://realtime.oxylabs.io/v1/queries"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "source": "universal",
-        "url": f"https://www.zillow.com/homes/comps/{lat},{lon}/"
-    }
-    
-    response = requests.post(url, auth=(USERNAME, PASSWORD), headers=headers, json=data)
-    
-    st.write("Debug - Raw Comps Response:", response.text)  # Print full response for debugging
-    
-    if response.status_code == 200:
-        return response.json()
-    else:
-        st.error(f"Error fetching comps: {response.status_code} {response.reason}")
-        return None
-
-# Function to calculate ARV
 def calculate_arv(comps):
-    if not comps:
+    if comps.empty:
         return 0
+    comps['price_per_sqft'] = comps['price'] / comps['sqft']
+    median_ppsqft = comps['price_per_sqft'].median()
+    avg_sqft = comps['sqft'].median()
+    return median_ppsqft * avg_sqft
+
+def estimate_repairs(avg_sqft):
+    return avg_sqft * 50  # Rough estimate: $50 per sqft repair cost
+
+def calculate_mao(arv, repair_costs):
+    return (arv * 0.6) - repair_costs
+
+def main():
+    address = input("Enter property address: ")
+    coords = get_coordinates(address)
+    if not coords:
+        print("Error: Could not find the location.")
+        return
     
-    prices = [comp["price"] for comp in comps if "price" in comp]
-    return sum(prices) / len(prices) if prices else 0
+    properties = scrape_property(location=address, listing_type="sold", past_days=90)
+    comps = filter_comps(properties, coords)
+    
+    arv = calculate_arv(comps)
+    repair_costs = estimate_repairs(comps['sqft'].median())
+    mao = calculate_mao(arv, repair_costs)
+    
+    print(f"ARV: ${arv:,.2f}")
+    print(f"Estimated Repairs: ${repair_costs:,.2f}")
+    print(f"MAO: ${mao:,.2f}")
+    
+    # Export results
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"Comps_Report_{timestamp}.csv"
+    comps.to_csv(filename, index=False)
+    print(f"Comps saved to {filename}")
 
-# Function to calculate MAO
-def calculate_mao(arv, repair_costs, percentage=0.6):
-    return (arv * percentage) - repair_costs
-
-# Streamlit UI
-st.title("Real Estate Valuation Tool")
-
-full_address = st.text_input("Enter Zillow Property URL (e.g., https://www.zillow.com/homedetails/...)")
-repair_costs = st.number_input("Estimated Repair Costs", min_value=0, step=1000)
-
-if st.button("Analyze Property"):
-    if is_valid_zillow_url(full_address):
-        property_data = fetch_property_data(full_address)
-        if property_data:
-            comps = fetch_comps(property_data)
-            arv = calculate_arv(comps)
-            mao = calculate_mao(arv, repair_costs)
-            
-            st.subheader("Property Valuation")
-            st.write(f"**ARV (After Repair Value):** ${arv:,.2f}")
-            st.write(f"**Maximum Allowable Offer (MAO):** ${mao:,.2f}")
-            
-            if comps:
-                st.subheader("Comparable Properties")
-                comp_df = pd.DataFrame([{ "Address": comp["address"], "Sale Price": comp["price"] } for comp in comps if "address" in comp and "price" in comp])
-                st.dataframe(comp_df)
-        else:
-            st.error("Failed to retrieve property data.")
-    else:
-        st.error("Please enter a valid Zillow property URL (e.g., https://www.zillow.com/homedetails/...)")
+if __name__ == "__main__":
+    main()
