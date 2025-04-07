@@ -1,78 +1,61 @@
-from homeharvest import scrape_property
-from geopy.geocoders import Nominatim
-from geopy.distance import geodesic
-import pandas as pd
-from datetime import datetime
+import requests
 
-def get_coordinates(address):
-    """Get latitude and longitude of a given address."""
-    try:
-        geolocator = Nominatim(user_agent="ai_comps_system")
-        location = geolocator.geocode(address, timeout=10)
-        if location:
-            return (location.latitude, location.longitude)
-        else:
-            print("Error: Could not find the location. Please check the address.")
-            return None
-    except Exception as e:
-        print(f"Geolocation error: {e}")
-        return None
+RAPIDAPI_KEY = "717efc6d4cmsh0b0eac96e27f6e8p170b9ajsnb5ed8a08c301"
 
-def filter_comps(properties, target_coords, min_distance=0.5, max_distance=1.0):
-    """Filter comparable properties based on distance range."""
-    if properties.empty:
-        print("No properties found for comps.")
-        return pd.DataFrame()
+def get_property_comps(address, citystatezip):
+    url = "https://zillow-com1.p.rapidapi.com/propertyExtendedSearch"
+    querystring = {"location": f"{address}, {citystatezip}"}
 
-    filtered = []
-    for _, row in properties.iterrows():
-        try:
-            prop_coords = (row['latitude'], row['longitude'])
-            distance = geodesic(target_coords, prop_coords).miles
-            if min_distance <= distance <= max_distance:
-                filtered.append(row)
-        except Exception as e:
-            print(f"Error processing property: {e}")
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com"
+    }
 
-    return pd.DataFrame(filtered)
+    response = requests.get(url, headers=headers, params=querystring)
+
+    if response.status_code == 200:
+        data = response.json()
+        comps = []
+
+        for result in data.get("props", []):
+            if result.get("statusType") == "RECENTLY_SOLD":
+                comps.append({
+                    "address": result.get("address", "N/A"),
+                    "price": result.get("price", 0)
+                })
+
+        return comps
+    else:
+        print(f"API Error: {response.status_code} - {response.text}")
+        return []
 
 def calculate_arv(comps):
-    """Calculate the After Repair Value (ARV) based on median price per square foot."""
-    if comps.empty:
-        print("No comps available to calculate ARV.")
-        return 0
+    prices = [comp["price"] for comp in comps if comp["price"] > 0]
+    return sum(prices) / len(prices) if prices else 0
 
-    try:
-        comps['price_per_sqft'] = comps['price'] / comps['sqft']
-        median_ppsqft = comps['price_per_sqft'].median()
-        avg_sqft = comps['sqft'].median()
-
-        if pd.isna(median_ppsqft) or pd.isna(avg_sqft):
-            print("Insufficient data to calculate ARV.")
-            return 0
-
-        return median_ppsqft * avg_sqft
-    except Exception as e:
-        print(f"Error calculating ARV: {e}")
-        return 0
-
-def estimate_repairs(avg_sqft):
-    """Estimate repair costs based on square footage."""
-    if pd.isna(avg_sqft) or avg_sqft <= 0:
-        return 0
-    return avg_sqft * 50  # Rough estimate: $50 per sqft repair cost
-
-def calculate_mao(arv, repair_costs):
-    """Calculate the Maximum Allowable Offer (MAO)."""
-    if arv <= 0:
-        return 0
+def calculate_mao(arv, repair_costs=0):
     return (arv * 0.6) - repair_costs
 
-def main():
-    address = input("Enter property address: ").strip()
-    coords = get_coordinates(address)
-    if not coords:
+def run_real_comps(address, citystatezip, repair_costs=0):
+    comps = get_property_comps(address, citystatezip)
+
+    if not comps:
+        print("❌ No comps found.")
         return
 
-    print("\nFetching comparable properties...")
-    properties = scrape_property_
+    arv = calculate_arv(comps)
+    mao = calculate_mao(arv, repair_costs)
+
+    print("\n✅ Nearby Sold Comps:")
+    for comp in comps:
+        print(f"- {comp['address']}: ${comp['price']:,}")
+
+    print(f"\n💰 ARV: ${arv:,.2f}")
+    print(f"🏷️ MAO (60% Rule): ${mao:,.2f}")
+
+# Example usage
+if __name__ == "__main__":
+    address = input("Enter property address (e.g., 123 Main St): ")
+    citystatezip = input("Enter city/state/zip (e.g., Saint Petersburg, FL): ")
+    repair_costs = float(input("Enter estimated repair costs (optional): ") or 0)
+    run_real_comps(address, citystatezip, repair_costs)
